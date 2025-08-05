@@ -1,0 +1,330 @@
+/* マインドマップアプリのスタイル */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #f5f5f5;
+    height: 100vh;
+    overflow: hidden;
+}
+
+#mindmap-container {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    overflow: hidden;
+    cursor: grab;
+}
+
+#mindmap-container:active {
+    cursor: grabbing;
+}
+
+#mindmap-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    pointer-events: none;
+    overflow: visible;
+}
+
+#nodes-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 20;
+}
+
+/* ノードのスタイル */
+.node {
+    position: absolute;
+    background: white;
+    border: 2px solid #e1e5e9;
+    border-radius: 20px;
+    padding: 12px 20px;
+    min-width: 120px;
+    max-width: 300px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    font-weight: 500;
+    color: #333;
+    text-align: center;
+    word-wrap: break-word;
+    user-select: none;
+}
+
+.node:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+    border-color: #4285f4;
+}
+
+.node.selected {
+    border-color: #4285f4;
+    box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.2);
+}
+
+.node.editing {
+    border-color: #4285f4;
+    box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.3);
+}
+
+.node.root {
+    background: linear-gradient(135deg, #4285f4, #34a853);
+    color: white;
+    border: none;
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.node.level-1,
+.node.level-2,
+.node.level-3,
+.node.level-4,
+.node.level-5 {
+    background: white;
+    border-color: #e1e5e9;
+}
+
+/* ノードのカスタム色 */
+.node.color-white { background: white; }
+.node.color-red { background: #ffebee; border-color: #f44336; }
+.node.color-pink { background: #fce4ec; border-color: #e91e63; }
+.node.color-purple { background: #f3e5f5; border-color: #9c27b0; }
+.node.color-blue { background: #e3f2fd; border-color: #2196f3; }
+.node.color-cyan { background: #e0f2f1; border-color: #00bcd4; }
+.node.color-green { background: #e8f5e8; border-color: #4caf50; }
+.node.color-yellow { background: #fffde7; border-color: #ffeb3b; }
+.node.color-orange { background: #fff3e0; border-color: #ff9800; }
+.node.color-brown { background: #efebe9; border-color: #795548; }
+
+/* 色変更メニュー */
+.color-menu {
+    position: fixed;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    padding: 16px;
+    z-index: 1000;
+    display: none;
+}
+
+.color-menu.visible {
+    display: block;
+}
+
+.color-palette {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.color-option {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 2px solid #e1e5e9;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.color-option:hover {
+    transform: scale(1.1);
+    border-color: #4285f4;
+}
+
+.color-option.selected {
+    border-color: #4285f4;
+    border-width: 3px;
+}
+
+.color-option.selected::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #4285f4;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+/* ノード編集時のインプット */
+.node-input {
+    background: transparent;
+    border: none;
+    outline: none;
+    font: inherit;
+    color: inherit;
+    text-align: center;
+    width: 100%;
+    resize: none;
+}
+
+/* 接続線のスタイル - オレンジ線 */
+.connection {
+    fill: none;
+    stroke: #ff9800;
+    stroke-width: 3;
+    opacity: 0.9;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.connection.level-1 {
+    stroke: #ff9800;
+    stroke-width: 3;
+}
+
+.connection.level-2 {
+    stroke: #ff9800;
+    stroke-width: 3;
+}
+
+.connection.level-3 {
+    stroke: #ff9800;
+    stroke-width: 3;
+}
+
+.connection.level-4 {
+    stroke: #ff9800;
+    stroke-width: 3;
+}
+
+/* 操作説明パネル */
+#instructions {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 15px;
+    border-radius: 10px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    font-size: 12px;
+    max-width: 220px;
+}
+
+#instructions h3 {
+    margin-bottom: 8px;
+    color: #333;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+#instructions ul {
+    list-style: none;
+}
+
+#instructions li {
+    margin-bottom: 4px;
+    color: #666;
+    line-height: 1.4;
+}
+
+#instructions .section {
+    margin-bottom: 10px;
+}
+
+#instructions .section:last-child {
+    margin-bottom: 0;
+}
+
+#instructions .section-title {
+    font-weight: 600;
+    color: #4285f4;
+    font-size: 11px;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* ドラッグ中のスタイル */
+.node.dragging {
+    z-index: 1000;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    filter: brightness(1.1);
+}
+
+/* ズーム時のノード品質保持 */
+.node {
+    transform-origin: center;
+    will-change: transform;
+}
+
+/* ツールバー */
+#toolbar {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 1000;
+    display: flex;
+    gap: 10px;
+}
+
+#undo-btn {
+    background: #2196F3;
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
+    transition: all 0.2s ease;
+}
+
+#undo-btn:hover {
+    background: #1976D2;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4);
+}
+
+#undo-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(33, 150, 243, 0.3);
+}
+
+#undo-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* パン中のカーソル */
+#mindmap-container.panning {
+    cursor: grabbing !important;
+}
+
+/* アニメーション */
+@keyframes nodeAppear {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.node.appear {
+    animation: nodeAppear 0.3s ease-out;
+}

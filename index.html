@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>マインドマップアプリ</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- 操作ボタン -->
+    <div id="toolbar">
+        <button id="undo-btn" title="元に戻す (Cmd+Z)">↶ 元に戻す</button>
+    </div>
+    
+    <!-- マインドマップのキャンバス -->
+    <div id="mindmap-container">
+        <svg id="mindmap-svg" width="100%" height="100%">
+            <!-- ノード間の接続線を描画するためのSVG -->
+            <g id="connections"></g>
+        </svg>
+        
+        <!-- ノードを配置するためのコンテナ -->
+        <div id="nodes-container"></div>
+    </div>
+    
+    <!-- 色変更メニュー -->
+    <div id="color-menu" class="color-menu">
+        <div class="color-palette">
+            <div class="color-option" data-color="white" style="background: white;"></div>
+            <div class="color-option" data-color="red" style="background: #ffebee;"></div>
+            <div class="color-option" data-color="pink" style="background: #fce4ec;"></div>
+            <div class="color-option" data-color="purple" style="background: #f3e5f5;"></div>
+            <div class="color-option" data-color="blue" style="background: #e3f2fd;"></div>
+            <div class="color-option" data-color="cyan" style="background: #e0f2f1;"></div>
+            <div class="color-option" data-color="green" style="background: #e8f5e8;"></div>
+            <div class="color-option" data-color="yellow" style="background: #fffde7;"></div>
+            <div class="color-option" data-color="orange" style="background: #fff3e0;"></div>
+            <div class="color-option" data-color="brown" style="background: #efebe9;"></div>
+        </div>
+    </div>
+
+    <!-- 操作説明 -->
+    <div id="instructions">
+        <h3>操作方法</h3>
+        
+        <div class="section">
+            <div class="section-title">ノード操作</div>
+            <ul>
+                <li>クリック: ノード選択</li>
+                <li>ダブルクリック: テキスト編集</li>
+                <li>ドラッグ: ノード移動</li>
+                <li>Delete: ノード削除</li>
+            </ul>
+        </div>
+        
+        <div class="section">
+            <div class="section-title">ノード追加</div>
+            <ul>
+                <li>Enter: 兄弟ノード追加</li>
+                <li>Tab: 子ノード追加</li>
+            </ul>
+        </div>
+        
+        <div class="section">
+            <div class="section-title">マップ操作</div>
+            <ul>
+                <li>マウスホイール: ズーム</li>
+                <li>空白をドラッグ: パン</li>
+                <li>矢印キー: パン</li>
+                <li>Home: 中央に戻る</li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
