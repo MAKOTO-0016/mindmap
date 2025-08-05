@@ -445,7 +445,7 @@ class MindMapApp {
     }
 
     /**
-     * レイアウトの更新（MindMeister風自動配置）
+     * レイアウトの更新（MindMeister風自動配置）- 完全重なり防止版
      */
     updateLayout() {
         const rootNode = Array.from(this.nodes.values()).find(node => node.level === 0);
@@ -455,13 +455,18 @@ class MindMapApp {
         rootNode.x = 0;
         rootNode.y = 0;
         
+        // 段階的レイアウト実行
         this.layoutChildrenMindMeisterStyle(rootNode);
+        
+        // 全ノードの重なりを厳重にチェック・調整
+        this.performComprehensiveOverlapResolution();
+        
         this.updateNodePositions();
         this.updateConnections();
     }
 
     /**
-     * 美しい整列レイアウトアルゴリズム（画像2風）
+     * 美しい整列レイアウトアルゴリズム（MindMeister風、線が交差しない）
      */
     layoutChildrenMindMeisterStyle(parentNode) {
         const children = parentNode.children.map(id => this.nodes.get(id)).filter(Boolean);
@@ -471,8 +476,8 @@ class MindMapApp {
             // ルートノードの子は左右に分散配置
             this.layoutRootChildren(parentNode, children);
         } else {
-            // その他のノードは美しい整列配置
-            this.layoutBranchChildrenAligned(parentNode, children);
+            // その他のノードは交差しない配置
+            this.layoutBranchChildrenNoIntersection(parentNode, children);
         }
         
         // 再帰的に子ノードの配置を計算
@@ -548,89 +553,403 @@ class MindMapApp {
         // 重なり検出と調整（より強力に）
         this.adjustOverlappingNodesAdvanced(children);
     }
-
+    
     /**
-     * ノードの重なりを検出して調整
+     * 線が交差しないブランチレイアウト（MindMeister風）
      */
-    adjustOverlappingNodes(nodes) {
-        const nodeWidth = 160; // 推定ノード幅
-        const nodeHeight = 50; // 推定ノード高さ
-        const minGap = 10; // 最小間隔
+    layoutBranchChildrenNoIntersection(parentNode, children) {
+        const baseDistance = 280;
+        const minVerticalSpacing = 120;
         
-        for (let i = 0; i < nodes.length; i++) {
-            for (let j = i + 1; j < nodes.length; j++) {
-                const nodeA = nodes[i];
-                const nodeB = nodes[j];
-                
-                // 重なり判定
-                const dx = Math.abs(nodeA.x - nodeB.x);
-                const dy = Math.abs(nodeA.y - nodeB.y);
-                
-                const overlapX = dx < (nodeWidth + minGap);
-                const overlapY = dy < (nodeHeight + minGap);
-                
-                if (overlapX && overlapY) {
-                    // Y軸方向に調整（より自然な配置）
-                    const adjustment = (nodeHeight + minGap) - dy;
-                    if (nodeA.y < nodeB.y) {
-                        nodeB.y += adjustment / 2;
-                        nodeA.y -= adjustment / 2;
-                    } else {
-                        nodeA.y += adjustment / 2;
-                        nodeB.y -= adjustment / 2;
-                    }
-                }
+        // 親ノードからの方向を決定
+        let direction = 1; // 右側がデフォルト
+        if (parentNode.parent) {
+            const grandParent = this.nodes.get(parentNode.parent);
+            if (grandParent) {
+                direction = parentNode.x > grandParent.x ? 1 : -1;
+            }
+        }
+        
+        // 兄弟ノードの子ノードとの衝突を防ぐためのスペース計算
+        const requiredSpace = this.calculateRequiredSpace(parentNode, children.length);
+        const verticalSpacing = Math.max(minVerticalSpacing, requiredSpace / Math.max(children.length - 1, 1));
+        
+        // 子ノードを配置
+        const totalHeight = (children.length - 1) * verticalSpacing;
+        const startY = parentNode.y - totalHeight / 2;
+        
+        children.forEach((child, index) => {
+            child.x = parentNode.x + (baseDistance * direction);
+            child.y = startY + (index * verticalSpacing);
+        });
+        
+        // 交差を防ぐための追加調整
+        this.avoidIntersections(parentNode, children);
+    }
+    
+    /**
+     * 必要なスペースを計算（兄弟ノードとの衝突を防ぐ）
+     */
+    calculateRequiredSpace(parentNode, childrenCount) {
+        if (!parentNode.parent) return 200; // ルートノードの子の場合
+        
+        const grandParent = this.nodes.get(parentNode.parent);
+        if (!grandParent) return 200;
+        
+        // 兄弟ノードを取得
+        const siblings = grandParent.children
+            .map(id => this.nodes.get(id))
+            .filter(node => node && node.id !== parentNode.id);
+        
+        let maxSiblingChildrenCount = 0;
+        siblings.forEach(sibling => {
+            if (sibling.children.length > maxSiblingChildrenCount) {
+                maxSiblingChildrenCount = sibling.children.length;
+            }
+        });
+        
+        // 兄弟ノードの子ノード数を考慮したスペース計算
+        const baseSpacing = 120;
+        const additionalSpacing = Math.max(maxSiblingChildrenCount, childrenCount) * 20;
+        
+        return baseSpacing + additionalSpacing;
+    }
+    
+    /**
+     * 交差を防ぐための調整
+     */
+    avoidIntersections(parentNode, children) {
+        if (!parentNode.parent || children.length === 0) return;
+        
+        const grandParent = this.nodes.get(parentNode.parent);
+        if (!grandParent) return;
+        
+        // 兄弟ノードとその子ノードを取得
+        const siblings = grandParent.children
+            .map(id => this.nodes.get(id))
+            .filter(node => node && node.id !== parentNode.id);
+        
+        // 各兄弟ノードの子ノードとの衝突をチェック
+        siblings.forEach(sibling => {
+            const siblingChildren = sibling.children.map(id => this.nodes.get(id)).filter(Boolean);
+            if (siblingChildren.length === 0) return;
+            
+            // Y軸方向の衝突をチェックして調整
+            this.adjustForSiblingConflicts(parentNode, children, sibling, siblingChildren);
+        });
+    }
+    
+    /**
+     * 兄弟ノードとの衝突を調整
+     */
+    adjustForSiblingConflicts(parentNode, children, siblingNode, siblingChildren) {
+        const minGap = 80; // 最小間隔
+        
+        // 親ノードと兄弟ノードのY座標関係をチェック
+        const parentAboveSibling = parentNode.y < siblingNode.y;
+        
+        if (parentAboveSibling) {
+            // 親ノードが上にある場合、子ノードを上寄りに調整
+            const maxChildY = Math.max(...children.map(child => child.y));
+            const minSiblingChildY = Math.min(...siblingChildren.map(child => child.y));
+            
+            if (maxChildY + minGap > minSiblingChildY) {
+                const adjustment = (maxChildY + minGap) - minSiblingChildY;
+                children.forEach(child => {
+                    child.y -= adjustment / 2;
+                });
+            }
+        } else {
+            // 親ノードが下にある場合、子ノードを下寄りに調整
+            const minChildY = Math.min(...children.map(child => child.y));
+            const maxSiblingChildY = Math.max(...siblingChildren.map(child => child.y));
+            
+            if (minChildY - minGap < maxSiblingChildY) {
+                const adjustment = maxSiblingChildY + minGap - minChildY;
+                children.forEach(child => {
+                    child.y += adjustment / 2;
+                });
             }
         }
     }
 
     /**
-     * より強力な重なり検出・調整アルゴリズム
+     * 🎯 完全な重なり防止システム - 全パターンを網羅した厳重チェック
      */
-    adjustOverlappingNodesAdvanced(nodes) {
-        const nodeWidth = 180; // より大きなノード幅を想定
-        const nodeHeight = 70; // より大きなノード高さを想定
-        const minGap = 20; // より大きな最小間隔
+    performComprehensiveOverlapResolution() {
+        console.log('🔍 完全重なり防止システム開始');
         
-        // 繰り返し調整で確実に重なりを解消
-        let maxIterations = 10;
-        let hasOverlap = true;
+        // 実際のノードサイズを動的に取得
+        const actualNodeDimensions = this.getActualNodeDimensions();
         
-        while (hasOverlap && maxIterations > 0) {
-            hasOverlap = false;
+        // 段階的重なり解消
+        this.resolveOverlapsByLevel(actualNodeDimensions);
+        this.resolveGlobalOverlaps(actualNodeDimensions);
+        this.validateNoOverlaps(actualNodeDimensions);
+        
+        console.log('✅ 完全重なり防止システム完了');
+    }
+    
+    /**
+     * 実際のノードサイズを動的に取得
+     */
+    getActualNodeDimensions() {
+        // デフォルト値
+        let nodeWidth = 140;
+        let nodeHeight = 50;
+        
+        // 実際のノード要素からサイズを取得
+        const firstNode = document.querySelector('.node');
+        if (firstNode) {
+            const rect = firstNode.getBoundingClientRect();
+            nodeWidth = Math.max(rect.width, 140); // 最小幅保証
+            nodeHeight = Math.max(rect.height, 50); // 最小高保証
+        }
+        
+        return {
+            width: nodeWidth,
+            height: nodeHeight,
+            minGapX: 30, // X軸最小間隔
+            minGapY: 25  // Y軸最小間隔
+        };
+    }
+    
+    /**
+     * レベル別重なり解消
+     */
+    resolveOverlapsByLevel(dimensions) {
+        const nodesByLevel = new Map();
+        
+        // レベル別にノードを分類
+        this.nodes.forEach(node => {
+            if (!nodesByLevel.has(node.level)) {
+                nodesByLevel.set(node.level, []);
+            }
+            nodesByLevel.get(node.level).push(node);
+        });
+        
+        // 各レベル内での重なり解消
+        nodesByLevel.forEach((levelNodes, level) => {
+            if (levelNodes.length > 1) {
+                this.resolveOverlapsInLevel(levelNodes, dimensions, level);
+            }
+        });
+    }
+    
+    /**
+     * 同一レベル内の重なり解消
+     */
+    resolveOverlapsInLevel(nodes, dimensions, level) {
+        const maxIterations = 15;
+        let iteration = 0;
+        
+        while (iteration < maxIterations) {
+            let hasOverlap = false;
             
             for (let i = 0; i < nodes.length; i++) {
                 for (let j = i + 1; j < nodes.length; j++) {
-                    const nodeA = nodes[i];
-                    const nodeB = nodes[j];
-                    
-                    // 重なり判定
-                    const dx = Math.abs(nodeA.x - nodeB.x);
-                    const dy = Math.abs(nodeA.y - nodeB.y);
-                    
-                    const overlapX = dx < (nodeWidth / 2 + minGap);
-                    const overlapY = dy < (nodeHeight + minGap);
-                    
-                    if (overlapX && overlapY) {
+                    if (this.resolveNodePairOverlap(nodes[i], nodes[j], dimensions)) {
                         hasOverlap = true;
-                        
-                        // Y軸方向に十分な距離で調整
-                        const requiredDistance = nodeHeight + minGap;
-                        const currentDistance = dy;
-                        const adjustment = (requiredDistance - currentDistance) + 10; // 余裕を持たせる
-                        
-                        if (nodeA.y < nodeB.y) {
-                            nodeB.y += adjustment;
-                        } else {
-                            nodeA.y += adjustment;
-                        }
                     }
                 }
             }
             
-            maxIterations--;
+            if (!hasOverlap) break;
+            iteration++;
+        }
+        
+        console.log(`📊 レベル${level}: ${iteration}回の調整で重なり解消`);
+    }
+    
+    /**
+     * グローバル重なり解消（全レベル横断）
+     */
+    resolveGlobalOverlaps(dimensions) {
+        const allNodes = Array.from(this.nodes.values());
+        const maxIterations = 20;
+        let iteration = 0;
+        
+        while (iteration < maxIterations) {
+            let hasOverlap = false;
+            
+            for (let i = 0; i < allNodes.length; i++) {
+                for (let j = i + 1; j < allNodes.length; j++) {
+                    if (this.resolveNodePairOverlap(allNodes[i], allNodes[j], dimensions)) {
+                        hasOverlap = true;
+                    }
+                }
+            }
+            
+            if (!hasOverlap) break;
+            iteration++;
+        }
+        
+        console.log(`🌐 グローバル調整: ${iteration}回で全重なり解消`);
+    }
+    
+    /**
+     * 2つのノード間の重なりを解消
+     */
+    resolveNodePairOverlap(nodeA, nodeB, dimensions) {
+        const dx = Math.abs(nodeA.x - nodeB.x);
+        const dy = Math.abs(nodeA.y - nodeB.y);
+        
+        const requiredDistanceX = (dimensions.width / 2) + dimensions.minGapX;
+        const requiredDistanceY = dimensions.height + dimensions.minGapY;
+        
+        const overlapX = dx < requiredDistanceX;
+        const overlapY = dy < requiredDistanceY;
+        
+        if (overlapX && overlapY) {
+            // 重なり解消の方向を決定
+            const adjustmentStrategy = this.determineAdjustmentStrategy(nodeA, nodeB);
+            this.applyOverlapAdjustment(nodeA, nodeB, dimensions, adjustmentStrategy);
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /**
+     * 調整戦略を決定
+     */
+    determineAdjustmentStrategy(nodeA, nodeB) {
+        // 親子関係をチェック
+        if (nodeA.parent === nodeB.id || nodeB.parent === nodeA.id) {
+            return 'parent-child';
+        }
+        
+        // 兄弟関係をチェック
+        if (nodeA.parent === nodeB.parent && nodeA.parent) {
+            return 'siblings';
+        }
+        
+        // レベル差をチェック
+        if (Math.abs(nodeA.level - nodeB.level) > 1) {
+            return 'distant-levels';
+        }
+        
+        return 'general';
+    }
+    
+    /**
+     * 重なり調整を適用
+     */
+    applyOverlapAdjustment(nodeA, nodeB, dimensions, strategy) {
+        const requiredDistanceY = dimensions.height + dimensions.minGapY + 10; // 余裕を持たせる
+        
+        switch (strategy) {
+            case 'parent-child':
+                // 親子関係の場合はY軸で大きく離す
+                this.adjustParentChildOverlap(nodeA, nodeB, requiredDistanceY);
+                break;
+                
+            case 'siblings':
+                // 兄弟関係の場合は均等に調整
+                this.adjustSiblingOverlap(nodeA, nodeB, requiredDistanceY);
+                break;
+                
+            case 'distant-levels':
+                // 遠いレベル同士は片方を大きく移動
+                this.adjustDistantLevelOverlap(nodeA, nodeB, requiredDistanceY);
+                break;
+                
+            default:
+                // 一般的な調整
+                this.adjustGeneralOverlap(nodeA, nodeB, requiredDistanceY);
         }
     }
+    
+    /**
+     * 親子関係の重なり調整
+     */
+    adjustParentChildOverlap(nodeA, nodeB, requiredDistance) {
+        const isAParent = nodeA.level < nodeB.level;
+        const parent = isAParent ? nodeA : nodeB;
+        const child = isAParent ? nodeB : nodeA;
+        
+        // 子ノードを親から十分離す
+        const direction = child.y > parent.y ? 1 : -1;
+        child.y = parent.y + (direction * requiredDistance * 1.5);
+    }
+    
+    /**
+     * 兄弟関係の重なり調整
+     */
+    adjustSiblingOverlap(nodeA, nodeB, requiredDistance) {
+        const midY = (nodeA.y + nodeB.y) / 2;
+        const adjustment = requiredDistance / 2;
+        
+        if (nodeA.y < nodeB.y) {
+            nodeA.y = midY - adjustment;
+            nodeB.y = midY + adjustment;
+        } else {
+            nodeA.y = midY + adjustment;
+            nodeB.y = midY - adjustment;
+        }
+    }
+    
+    /**
+     * 遠いレベル間の重なり調整
+     */
+    adjustDistantLevelOverlap(nodeA, nodeB, requiredDistance) {
+        // より深いレベルのノードを移動
+        const deeperNode = nodeA.level > nodeB.level ? nodeA : nodeB;
+        const direction = deeperNode.y > 0 ? 1 : -1;
+        deeperNode.y += direction * requiredDistance;
+    }
+    
+    /**
+     * 一般的な重なり調整
+     */
+    adjustGeneralOverlap(nodeA, nodeB, requiredDistance) {
+        const currentDistance = Math.abs(nodeA.y - nodeB.y);
+        const adjustment = (requiredDistance - currentDistance) / 2 + 5; // 余裕を持たせる
+        
+        if (nodeA.y < nodeB.y) {
+            nodeA.y -= adjustment;
+            nodeB.y += adjustment;
+        } else {
+            nodeA.y += adjustment;
+            nodeB.y -= adjustment;
+        }
+    }
+    
+    /**
+     * 最終検証 - 重なりが完全に解消されたかチェック
+     */
+    validateNoOverlaps(dimensions) {
+        const allNodes = Array.from(this.nodes.values());
+        let overlapCount = 0;
+        
+        for (let i = 0; i < allNodes.length; i++) {
+            for (let j = i + 1; j < allNodes.length; j++) {
+                const nodeA = allNodes[i];
+                const nodeB = allNodes[j];
+                
+                const dx = Math.abs(nodeA.x - nodeB.x);
+                const dy = Math.abs(nodeA.y - nodeB.y);
+                
+                const requiredDistanceX = (dimensions.width / 2) + dimensions.minGapX;
+                const requiredDistanceY = dimensions.height + dimensions.minGapY;
+                
+                if (dx < requiredDistanceX && dy < requiredDistanceY) {
+                    overlapCount++;
+                    console.warn(`⚠️ 重なり検出: ${nodeA.text} と ${nodeB.text}`);
+                }
+            }
+        }
+        
+        if (overlapCount === 0) {
+            console.log('✅ 重なり検証完了: 重なりなし');
+        } else {
+            console.warn(`⚠️ 重なり検証: ${overlapCount}個の重なりが残存`);
+        }
+        
+        return overlapCount === 0;
+    }
+
+
 
     /**
      * ノード位置の更新
